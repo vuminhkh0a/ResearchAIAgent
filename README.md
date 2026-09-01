@@ -1,4 +1,4 @@
-# Local AI Research Assistant (V1)
+# Local AI Research Assistant - V1 (On-going)
 
 A lightweight research assistant that runs **Qwen3 locally through Ollama**. LangGraph orchestrates the agent. RAG is a retrieval capability the agent can invoke — it is not the same thing as LangGraph.
 
