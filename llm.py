@@ -19,12 +19,21 @@ def get_llm(*, temperature: float | None = None):
     from langchain_ollama import ChatOllama
     
     require_ollama()
+    model = settings.ollama_model
+    # qwen3 models need more tokens for thinking + response
+    num_predict = 2048 if "qwen3" in model else 1024
     kwargs = {
-        "model": settings.ollama_model,
+        "model": model,
         "base_url": settings.ollama_base_url,
         "temperature": settings.llm_temperature if temperature is None else temperature,
+        "reasoning": False,
+        "options": {"think": False, "num_predict": num_predict},
     }
     try:
-        return ChatOllama(**kwargs, reasoning=False)
-    except TypeError:
         return ChatOllama(**kwargs)
+    except TypeError:
+        return ChatOllama(
+            model=model,
+            base_url=settings.ollama_base_url,
+            temperature=settings.llm_temperature if temperature is None else temperature,
+        )
