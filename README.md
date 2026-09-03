@@ -19,153 +19,114 @@ Runs on **Windows, Linux, and macOS** — with **Docker** (easiest), **Kubernete
 
 ## Contents
 
-- [Docker (easiest, 3 steps)](#docker-easiest-3-steps)
-- [Kubernetes (4 steps)](#kubernetes-4-steps)
-- [Native Python (3 steps)](#native-python-3-steps)
+- [INSTALLATION](#installation)
+  - [Windows users](#windows-users)
+  - [macOS users](#macos-users)
+  - [Linux users](#linux-users)
+  - [Kubernetes (any system, optional)](#kubernetes-any-system-optional)
 - [Settings](#settings)
 - [Architecture](#architecture)
 - [Example Queries](#example-queries)
 - [Project Structure](#project-structure)
 - [Performance Notes](#performance-notes)
-- [For Linux Users: vLLM (native only)](#for-linux-users-vllm-native-only)
 - [Troubleshooting](#troubleshooting)
 - [License](#license)
 
 ---
 
-## Docker (easiest, 3 steps)
+## INSTALLATION
 
-No Python or Ollama setup needed — one command starts the app **and** the Ollama server, and downloads the model automatically.
+Find yourself below. Every path ends with the app at **`http://localhost:8501`**.
 
-**Step 1 — Install Docker** (one command for your OS, then start Docker Desktop where applicable):
+### Windows users
+
+Recommended: Docker (no Python setup needed — app, Ollama, and the model come in containers).
 
 ```powershell
-winget install Docker.DockerDesktop          # Windows (PowerShell)
+winget install Docker.DockerDesktop
 ```
+
+Start **Docker Desktop** from the Start menu and wait for "Engine running". Then:
+
+```powershell
+cd path\to\ResearchAiAgent
+docker compose up --build -d
+```
+
+First start takes a few minutes (the ~2.5 GB `qwen3:4b` model downloads automatically). Open `http://localhost:8501`. Done.
+
+- NVIDIA GPU: Docker Desktop already uses the WSL2 backend — just run with the GPU override instead: `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build -d`
+- No Docker? Install Python 3.11+ and [Ollama](https://ollama.com), then: `python -m venv .venv` → `.\.venv\Scripts\python.exe -m pip install -r requirements.txt` → `copy .env.example .env` → `ollama pull qwen3:4b` → `.\.venv\Scripts\python.exe -m streamlit run app.py`
+- Stop anytime: `docker compose down` (data kept) · logs: `docker compose logs -f app`
+
+### macOS users
+
+Recommended: Docker (works on Intel and Apple Silicon; no Python setup needed).
 
 ```bash
-brew install --cask docker                   # macOS (Terminal, then open Docker Desktop)
-curl -fsSL https://get.docker.com | sh       # Linux (Terminal)
+brew install --cask docker
 ```
 
-Check it works: `docker --version` (Linux: log out and back in first if you just installed).
-
-**Step 2 — Run:**
+Open **Docker Desktop** from Applications and wait for "Engine running". Then:
 
 ```bash
 cd /path/to/ResearchAiAgent
 docker compose up --build -d
 ```
 
-First start takes a few minutes (downloads the ~2.5 GB `qwen3:4b` model automatically). Data, models, and uploads persist across restarts.
+First start takes a few minutes (the ~2.5 GB `qwen3:4b` model downloads automatically). Open `http://localhost:8501`. Done.
 
-**Step 3 — Open `http://localhost:8501`.** Done.
+- Note: containers can't use the GPU on Mac, so inference is CPU-only (~3-10x slower than NVIDIA). For faster answers, skip Docker: install Python 3.11+ and [Ollama for Mac](https://ollama.com) (uses Metal), then: `python3 -m venv .venv` → `.venv/bin/python -m pip install -r requirements.txt` → `cp .env.example .env` → `ollama pull qwen3:4b` → `.venv/bin/python -m streamlit run app.py`
+- Stop anytime: `docker compose down` (data kept) · logs: `docker compose logs -f app`
 
-Extra commands (optional):
+### Linux users
 
-```bash
-docker compose logs -f app      # watch logs
-docker compose down             # stop (data kept)
-docker compose down -v          # stop and delete ALL data
-```
-
-**NVIDIA GPU?** Linux: install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html), then run with the GPU override instead of step 2 (Windows WSL2 backend also works; **macOS: not supported**, just use the normal command):
+Recommended: Docker (no Python setup needed — app, Ollama, and the model come in containers).
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build -d
+curl -fsSL https://get.docker.com | sh
 ```
 
----
-
-## Kubernetes (4 steps)
-
-Deploys the app + Ollama into any cluster (Docker Desktop K8s, minikube, kind, cloud).
-
-**Step 1 — Install kubectl and a cluster (if you don't have one):**
-
-```powershell
-winget install Kubernetes.kubectl Kubernetes.minikube   # Windows
-```
+(Log out and back in afterwards so `docker` runs without `sudo`.) Then:
 
 ```bash
-brew install kubectl minikube                            # macOS
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install kubectl /usr/local/bin/kubectl   # Linux (+ minikube or kind)
+cd /path/to/ResearchAiAgent
+docker compose up --build -d
 ```
 
-```bash
-minikube start --driver=docker   # only for minikube; skip for Docker Desktop K8s / kind / cloud
-```
+First start takes a few minutes (the ~2.5 GB `qwen3:4b` model downloads automatically). Open `http://localhost:8501`. Done.
 
-**Step 2 — Build the image and give it to your cluster:**
+- NVIDIA GPU: install the [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html), then run with the GPU override instead: `docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build -d`
+- No Docker? Install Python 3.11+ and Ollama (`curl -fsSL https://ollama.com/install.sh | sh`), then: `python3 -m venv .venv` → `.venv/bin/python -m pip install -r requirements.txt` → `cp .env.example .env` → `ollama pull qwen3:4b` → `.venv/bin/python -m streamlit run app.py`
+- Maximum speed (native only, CUDA 12.1+): `pip install vllm==0.6.0`, then set `LLM_BACKEND=vllm` in `.env`
+- Stop anytime: `docker compose down` (data kept) · logs: `docker compose logs -f app`
+
+### Kubernetes (any system, optional)
+
+For clusters (Docker Desktop K8s, minikube, kind, cloud) instead of Docker Compose.
 
 ```bash
+# 1. Install kubectl (+ a cluster if needed):
+#    Windows: winget install Kubernetes.kubectl Kubernetes.minikube
+#    macOS:   brew install kubectl minikube
+#    Linux:   curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" && sudo install kubectl /usr/local/bin/kubectl
+#    Then (minikube only): minikube start --driver=docker
+
+# 2. Build the image and give it to your cluster:
 cd /path/to/ResearchAiAgent
 docker build -t research-agent:latest .
 kind load docker-image research-agent:latest      # kind only
 minikube image load research-agent:latest         # minikube only
 # Docker Desktop K8s needs neither load command; cloud clusters: push to a
 # registry and update `image:` in k8s/app.yaml instead.
-```
 
-**Step 3 — Deploy everything (app + Ollama + model download):**
-
-```bash
+# 3. Deploy everything (app + Ollama + model download):
 kubectl apply -k k8s/
-```
 
-**Step 4 — Open the app:**
-
-```bash
+# 4. Open the app:
 kubectl -n research-agent port-forward svc/app 8501:8501
+# → http://localhost:8501. Done.
 ```
-
-Then open `http://localhost:8501`. Done.
-
-Extra commands (optional):
-
-```bash
-kubectl -n research-agent get pods                 # status
-kubectl -n research-agent logs -f deploy/app       # logs
-kubectl -n research-agent logs -f job/ollama-model-pull   # model download progress
-kubectl -n research-agent delete -k k8s/           # remove everything
-```
-
----
-
-## Native Python (3 steps)
-
-**Step 1 — Install Python 3.11+ and [Ollama](https://ollama.com)** (Windows/macOS: installer; Linux: `curl -fsSL https://ollama.com/install.sh | sh`).
-
-**Step 2 — Install the app:**
-
-```powershell
-# Windows (PowerShell)
-cd C:\Users\LENOVO\ResearchAiAgent
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r requirements.txt
-copy .env.example .env
-```
-
-```bash
-# macOS / Linux
-cd /path/to/ResearchAiAgent
-python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-cp .env.example .env
-```
-
-**Step 3 — Pull the model and run** (keep `ollama serve` running):
-
-```bash
-ollama pull qwen3:4b
-```
-
-```powershell
-# Windows: .\.venv\Scripts\python.exe -m streamlit run app.py
-# macOS/Linux: .venv/bin/python -m streamlit run app.py
-```
-
-Then open `http://localhost:8501`. Done.
 
 ---
 
@@ -302,16 +263,6 @@ ResearchAiAgent/
 | Embeddings (100 docs) | 1-2s |
 
 Docker/Kubernetes add negligible overhead. On macOS (CPU-only Ollama in Docker) expect roughly 3-10x slower inference than an NVIDIA GPU — for faster Mac inference, run natively with Ollama for Mac (Metal acceleration) instead.
-
----
-
-## For Linux Users: vLLM (native only)
-
-```bash
-pip install vllm==0.6.0   # requires CUDA 12.1+, native Linux
-```
-
-Then set in `.env`: `LLM_BACKEND=vllm`, `VLLM_MODEL=Qwen/Qwen3-4B-Instruct`. (Not available in Docker/K8s — Ollama already gives GPU acceleration there.)
 
 ---
 
