@@ -1,0 +1,22 @@
+# GPU override for docker compose.
+# Linux: requires the NVIDIA Container Toolkit
+#   (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html).
+# Windows: requires Docker Desktop with the WSL2 backend + NVIDIA GPU + drivers.
+# macOS: NOT supported (no NVIDIA GPUs / no GPU passthrough) — use docker-compose.yml as-is.
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build -d
+#   docker exec research-ollama ollama pull qwen3:8b   # bigger model for bigger VRAM
+
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      # Keep all GPU memory available for the model.
+      - OLLAMA_KEEP_ALIVE=24h

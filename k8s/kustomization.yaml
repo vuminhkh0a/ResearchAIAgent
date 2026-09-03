@@ -1,0 +1,19 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: research-agent
+
+commonLabels:
+  app.kubernetes.io/name: research-agent
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - pvc.yaml
+  - ollama.yaml
+  - app.yaml
+  # Included here so a single `kubectl apply -k k8s/` also downloads the
+  # model. To re-pull after changing OLLAMA_MODEL, delete then re-apply:
+  #   kubectl -n research-agent delete job ollama-model-pull
+  #   kubectl -n research-agent apply -k k8s/
+  - model-pull-job.yaml

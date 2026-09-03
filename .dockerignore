@@ -1,0 +1,32 @@
+# ---- Python ----
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ---- Secrets / local state (never bake into the image) ----
+.env
+.streamlit/secrets.toml
+*.log
+
+# ---- Runtime data (provided via volumes, not the image) ----
+data/chroma/
+data/uploads/
+data/ingested.json
+
+# ---- Dev / OS noise ----
+.git/
+.gitignore
+.idea/
+.vscode/
+*.md
+.DS_Store
+Thumbs.db
+
+# ---- Container orchestration (docs, not app code) ----
+k8s/
+docker-compose*.yml

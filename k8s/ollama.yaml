@@ -1,0 +1,80 @@
+# Ollama LLM server (CPU by default; see GPU notes below).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: research-agent
+  labels:
+    app.kubernetes.io/name: research-agent
+    app.kubernetes.io/component: ollama
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: ollama
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: research-agent
+        app.kubernetes.io/component: ollama
+    spec:
+      containers:
+        - name: ollama
+          image: ollama/ollama:latest
+          ports:
+            - containerPort: 11434
+              name: http
+          volumeMounts:
+            - name: models
+              mountPath: /root/.ollama
+          readinessProbe:
+            httpGet:
+              path: /api/tags
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /api/tags
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 2Gi
+            limits:
+              memory: 12Gi
+          # ---- GPU (Linux nodes with NVIDIA GPUs only) ----
+          # 1. Install the NVIDIA device plugin:
+          #      kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.17.0/deployments/static/nvidia-device-plugin.yml
+          # 2. Uncomment the lines below (request 1 GPU):
+          #resources:
+          #  requests:
+          #    cpu: "1000m"
+          #    memory: 4Gi
+          #    nvidia.com/gpu: 1
+          #  limits:
+          #    memory: 16Gi
+          #    nvidia.com/gpu: 1
+      volumes:
+        - name: models
+          persistentVolumeClaim:
+            claimName: ollama-models
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ollama
+  namespace: research-agent
+  labels:
+    app.kubernetes.io/name: research-agent
+    app.kubernetes.io/component: ollama
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/component: ollama
+  ports:
+    - name: http
+      port: 11434
+      targetPort: http

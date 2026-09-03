@@ -1,0 +1,31 @@
+# Persistent storage.
+# - app-data: Chroma DB + uploads + ingestion index (survives pod restarts).
+# - ollama-models: downloaded LLM weights, multi-GB (survives pod restarts).
+# Uses your cluster's default StorageClass (works on Docker Desktop,
+# minikube, kind with a default provisioner, and most cloud clusters).
+# Resize to fit your models: qwen3:4b ~2.5 GB, qwen3:8b ~5.2 GB.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-data
+  namespace: research-agent
+  labels:
+    app.kubernetes.io/name: research-agent
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 5Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ollama-models
+  namespace: research-agent
+  labels:
+    app.kubernetes.io/name: research-agent
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 15Gi

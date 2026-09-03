@@ -1,0 +1,85 @@
+# Streamlit research-assistant app.
+# Image: build and make it available to your cluster first (see README):
+#   Docker Desktop K8s / single-node:   docker build -t research-agent:latest .
+#   kind:    kind load docker-image research-agent:latest
+#   minikube: minikube image load research-agent:latest
+#   remote cluster: docker tag/push to your registry, then edit `image:` below.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: app
+  namespace: research-agent
+  labels:
+    app.kubernetes.io/name: research-agent
+    app.kubernetes.io/component: app
+spec:
+  # Keep 1 replica: Chroma uses a local file DB (SQLite) that cannot be
+  # safely shared by multiple writers.
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: app
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: research-agent
+        app.kubernetes.io/component: app
+    spec:
+      containers:
+        - name: app
+          image: research-agent:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8501
+              name: http
+          envFrom:
+            - configMapRef:
+                name: app-config
+            # Optional: `kubectl -n research-agent create secret generic app-secrets
+            #   --from-literal=TAVILY_API_KEY=tvly-...` to enable Tavily search.
+            # `optional: true` means the app still starts if the secret is absent.
+            - secretRef:
+                name: app-secrets
+                optional: true
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+          readinessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 15
+          livenessProbe:
+            httpGet:
+              path: /_stcore/health
+              port: http
+            initialDelaySeconds: 90
+            periodSeconds: 30
+          resources:
+            requests:
+              cpu: "500m"
+              memory: 1Gi
+            limits:
+              memory: 6Gi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: app-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: app
+  namespace: research-agent
+  labels:
+    app.kubernetes.io/name: research-agent
+    app.kubernetes.io/component: app
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/component: app
+  ports:
+    - name: http
+      port: 8501
+      targetPort: http

@@ -1,0 +1,27 @@
+# Non-secret configuration shared by the app.
+# Edit values here (or `kubectl -n research-agent edit configmap app-config`)
+# then restart the app: `kubectl -n research-agent rollout restart deploy/app`.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config
+  namespace: research-agent
+  labels:
+    app.kubernetes.io/name: research-agent
+data:
+  LLM_BACKEND: "ollama"
+  # In-cluster Ollama address (Service name `ollama`, port 11434).
+  OLLAMA_BASE_URL: "http://ollama:11434"
+  OLLAMA_MODEL: "qwen3:4b"
+  EMBEDDING_MODEL: "sentence-transformers/all-MiniLM-L6-v2"
+  EMBEDDING_USE_ONNX: "true"
+  EMBEDDING_BATCH_SIZE: "32"
+  CHUNK_SIZE: "1500"
+  CHUNK_OVERLAP: "200"
+  RETRIEVAL_K: "4"
+  MAX_CONTEXT_TOKENS: "4000"
+  CONTEXT_WINDOW_TOKENS: "8192"
+  RESERVED_RESPONSE_TOKENS: "2048"
+  SEARCH_PROVIDER: "duckduckgo"
+  SEARCH_MAX_RESULTS: "5"
+  LLM_TEMPERATURE: "0.1"

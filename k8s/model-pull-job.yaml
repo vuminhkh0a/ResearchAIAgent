@@ -1,0 +1,39 @@
+# One-shot Job: downloads the LLM into the in-cluster Ollama server.
+# Runs automatically via `kubectl apply -k k8s/` (retries until Ollama is up).
+# Watch progress:
+#   kubectl -n research-agent logs -f job/ollama-model-pull
+# To re-pull after changing OLLAMA_MODEL, delete then re-apply:
+#   kubectl -n research-agent delete job ollama-model-pull
+#   kubectl -n research-agent apply -k k8s/
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: ollama-model-pull
+  namespace: research-agent
+  labels:
+    app.kubernetes.io/name: research-agent
+    app.kubernetes.io/component: ollama
+spec:
+  backoffLimit: 6
+  # Model pulls are slow (GBs); allow plenty of time.
+  activeDeadlineSeconds: 3600
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: pull
+          image: curlimages/curl:8.10.1
+          env:
+            - name: OLLAMA_MODEL
+              valueFrom:
+                configMapKeyRef:
+                  name: app-config
+                  key: OLLAMA_MODEL
+          # POST /api/pull with stream=false so the Job exits when done.
+          args:
+            - "-sS"
+            - "-X"
+            - "POST"
+            - "http://ollama:11434/api/pull"
+            - "-d"
+            - '{"name": "$(OLLAMA_MODEL)", "stream": false}'

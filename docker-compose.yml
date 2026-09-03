@@ -1,0 +1,86 @@
+# Works on Windows (Docker Desktop), Linux and macOS (Intel + Apple Silicon).
+# The app talks to Ollama over the compose network, so no host install of
+# Ollama or Python is needed.
+#
+# Usage (same on Windows, Linux, macOS):
+#   docker compose up --build -d   # starts app + Ollama, downloads the model automatically
+#   # open http://localhost:8501 (first start takes a few minutes: ~2.5 GB model download)
+#   docker compose logs -f app     # watch the app
+#   docker compose down            # stop (data is kept in volumes)
+#
+# GPU (Linux, or Windows via WSL2 backend + NVIDIA Container Toolkit):
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up --build -d
+
+name: research-agent
+
+services:
+  app:
+    build: .
+    image: research-agent:latest
+    container_name: research-app
+    ports:
+      - "8501:8501"
+    # .env is loaded if present, but the explicit environment below always wins.
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      LLM_BACKEND: ollama
+      # Inside compose, Ollama is reachable at the service name `ollama`.
+      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
+      EMBEDDING_MODEL: ${EMBEDDING_MODEL:-sentence-transformers/all-MiniLM-L6-v2}
+      EMBEDDING_USE_ONNX: ${EMBEDDING_USE_ONNX:-true}
+      CHUNK_SIZE: ${CHUNK_SIZE:-1500}
+      CHUNK_OVERLAP: ${CHUNK_OVERLAP:-200}
+      RETRIEVAL_K: ${RETRIEVAL_K:-4}
+      MAX_CONTEXT_TOKENS: ${MAX_CONTEXT_TOKENS:-4000}
+      SEARCH_PROVIDER: ${SEARCH_PROVIDER:-duckduckgo}
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      LLM_TEMPERATURE: ${LLM_TEMPERATURE:-0.1}
+    volumes:
+      # Persist Chroma DB, uploads and ingestion index across restarts.
+      - app-data:/app/data
+      # Persist downloaded embedding models so restarts stay fast.
+      - hf-cache:/home/appuser/.cache/huggingface
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: research-ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      # Persist downloaded LLM models (multi-GB) across restarts.
+      - ollama-data:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+  # One-shot helper: downloads the model into the `ollama` service via its
+  # API. Runs automatically on every `docker compose up` (fast no-op if the
+  # model is already downloaded), so there is no separate pull step.
+  pull-model:
+    image: curlimages/curl:8.10.1
+    depends_on:
+      ollama:
+        condition: service_healthy
+    command:
+      - "-sS"
+      - "-X"
+      - "POST"
+      - "http://ollama:11434/api/pull"
+      - "-d"
+      - '{"name": "${OLLAMA_MODEL:-qwen3:4b}", "stream": false}'
+
+volumes:
+  app-data:
+  hf-cache:
+  ollama-data:
